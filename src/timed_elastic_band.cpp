@@ -52,6 +52,7 @@ namespace
   double estimateDeltaT(const PoseSE2& start, const PoseSE2& end,
                         double max_vel_x, double max_vel_theta)
   {
+    // 取移动和转头的最大值
     double dt_constant_motion = 0.1;
     if (max_vel_x > 0) {
       double trans_dist = (end.position() - start.position()).norm();
@@ -330,7 +331,8 @@ bool TimedElasticBand::initTrajectoryToGoal(const PoseSE2& start, const PoseSE2&
     setPoseVertexFixed(0,true); // StartConf is a fixed constraint during optimization
 
     double timestep = 0.1;
-        
+    
+    // 从起点和终点匀速均匀采样
     if (diststep!=0)
     {
       Eigen::Vector2d point_to_goal = goal.position()-start.position();
@@ -358,6 +360,7 @@ bool TimedElasticBand::initTrajectoryToGoal(const PoseSE2& start, const PoseSE2&
 
     }
     
+    // 如果航点个数小于一定值，那么从末尾添加多几个航点。假设是匀速的
     // if number of samples is not larger than min_samples, insert manually
     if ( sizePoses() < min_samples-1 )
     {
@@ -371,6 +374,7 @@ bool TimedElasticBand::initTrajectoryToGoal(const PoseSE2& start, const PoseSE2&
       }
     }
     
+    // 插入目标点
     // add goal
     if (max_vel_x > 0) timestep = (goal.position()-BackPose().position()).norm()/max_vel_x;
     addPoseAndTimeDiff(goal,timestep); // add goal point
@@ -394,6 +398,7 @@ bool TimedElasticBand::initTrajectoryToGoal(const std::vector<geometry_msgs::Pos
     PoseSE2 start(plan.front().pose);
     PoseSE2 goal(plan.back().pose);
     
+    // 添加起点
     addPose(start); // add starting point with given orientation
     setPoseVertexFixed(0,true); // StartConf is a fixed constraint during optimization
 
@@ -402,8 +407,10 @@ bool TimedElasticBand::initTrajectoryToGoal(const std::vector<geometry_msgs::Pos
         backwards = true;
     // TODO: dt ~ max_vel_x_backwards for backwards motions
     
+    // 遍历所有航点
     for (int i=1; i<(int)plan.size()-1; ++i)
     {
+        // 估算目标偏航
         double yaw;
         if (estimate_orient)
         {
@@ -418,11 +425,13 @@ bool TimedElasticBand::initTrajectoryToGoal(const std::vector<geometry_msgs::Pos
         {
             yaw = tf::getYaw(plan[i].pose.orientation);
         }
+        // 估算中间时间
         PoseSE2 intermediate_pose(plan[i].pose.position.x, plan[i].pose.position.y, yaw);
         double dt = estimateDeltaT(BackPose(), intermediate_pose, max_vel_x, max_vel_theta);
         addPoseAndTimeDiff(intermediate_pose, dt);
     }
     
+    // 如果航点个数小于一定值，那么从末尾添加多几个航点。
     // if number of samples is not larger than min_samples, insert manually
     if ( sizePoses() < min_samples-1 )
     {
@@ -436,6 +445,7 @@ bool TimedElasticBand::initTrajectoryToGoal(const std::vector<geometry_msgs::Pos
       }
     }
     
+    // 插入目标点
     // Now add final state with given orientation
     double dt = estimateDeltaT(BackPose(), goal, max_vel_x, max_vel_theta);
     addPoseAndTimeDiff(goal, dt);

@@ -41,16 +41,17 @@
 namespace teb_local_planner
 {
 
-  
-
+// 时间分配：假设两点直接匀速、或者完成纯加减速
 template<typename BidirIter, typename Fun>
 bool TimedElasticBand::initTrajectoryToGoal(BidirIter path_start, BidirIter path_end, Fun fun_position, double max_vel_x, double max_vel_theta,
                                      boost::optional<double> max_acc_x, boost::optional<double> max_acc_theta,
                                      boost::optional<double> start_orientation, boost::optional<double> goal_orientation, int min_samples, bool guess_backwards_motion) 
 {
+    // 提取起点和终点
     Eigen::Vector2d start_position = fun_position( *path_start );
     Eigen::Vector2d goal_position = fun_position( *boost::prior(path_end) );
     
+    // 判断是否需要后退
     bool backwards = false;
     
     double start_orient, goal_orient;
@@ -97,9 +98,11 @@ bool TimedElasticBand::initTrajectoryToGoal(BidirIter path_start, BidirIter path
                                                                         // where fun_position() does not return a reference or is expensive.
             double diff_norm = diff_last.norm();
             
+            // 考虑该段是匀速运动
             double timestep_vel = diff_norm/max_vel_x; // constant velocity
             double timestep_acc;
 
+            // 考虑该段能完成纯加速度或减速，能否走完。取最小值
             if (max_acc_x)
             {
                     timestep_acc = sqrt(2*diff_norm/(*max_acc_x)); // constant acceleration
@@ -108,11 +111,14 @@ bool TimedElasticBand::initTrajectoryToGoal(BidirIter path_start, BidirIter path
             }
             else timestep = timestep_vel;
             
+            // 限制时间最小值
             if (timestep<=0) timestep=0.2; // TODO: this is an assumption
             
+            // 根据前后向调整目标航向
             double yaw = atan2(diff_last[1],diff_last[0]);
             if (backwards)
                 yaw = g2o::normalize_theta(yaw + M_PI);
+
             addPoseAndTimeDiff(curr_point, yaw ,timestep);
             
             /*
